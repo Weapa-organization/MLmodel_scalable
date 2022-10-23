@@ -106,3 +106,89 @@ train.show(3)
 train.select('scaled_numerical_feature_vector').take(3)
 
 from pyspark.ml.feature import StringIndexer
+
+indexer = StringIndexer(inputCol='ocean_proximity',
+                        outputCol='ocean_category_index')
+
+indexer = indexer.fit(train)
+train = indexer.transform(train)
+test = indexer.transform(test)
+
+train.show(3)
+
+set(train.select('ocean_category_index').collect())
+
+from pyspark.ml.feature import OneHotEncoder
+
+one_hot_encoder = OneHotEncoder(inputCol='ocean_category_index',
+                                outputCol='ocean_category_one_hot')
+
+one_hot_encoder = one_hot_encoder.fit(train)
+
+train = one_hot_encoder.transform(train)
+test = one_hot_encoder.transform(test)
+
+train.show(3)
+
+assembler = VectorAssembler(inputCols=['scaled_numerical_feature_vector',
+                                       'ocean_category_one_hot'],
+                            outputCol='final_feature_vector')
+
+train = assembler.transform(train)
+test = assembler.transform(test)
+
+train.show(2)
+
+train.select('final_feature_vector').take(2)
+
+from pyspark.ml.regression import LinearRegression
+
+lr = LinearRegression(featuresCol='final_feature_vector',
+                      labelCol='median_house_value')
+
+lr
+
+lr = lr.fit(train)
+
+lr
+
+pred_train_df = lr.transform(train).withColumnRenamed('prediction',
+                                                      'predicted_median_house_value')
+
+pred_train_df.show(5)
+
+pred_test_df = lr.transform(test).withColumnRenamed('prediction', 'predicted_median_house_value')
+
+pred_test_df.show(5)
+
+pred_test_pd_df = pred_test_df.toPandas()
+
+pred_test_pd_df.head(2)
+
+predictions_and_actuals = pred_test_df[['predicted_median_house_value',
+                                        'median_house_value']]
+
+predictions_and_actuals_rdd = predictions_and_actuals.rdd
+
+predictions_and_actuals_rdd.take(2)
+
+predictions_and_actuals_rdd = predictions_and_actuals_rdd.map(tuple)
+
+predictions_and_actuals_rdd.take(2)
+
+from pyspark.mllib.evaluation import RegressionMetrics
+
+metrics = RegressionMetrics(predictions_and_actuals_rdd)
+
+s = '''
+Mean Squared Error:      {0}
+Root Mean Squared Error: {1}
+Mean Absolute Error:     {2}
+R**2:                    {3}
+'''.format(metrics.meanSquaredError,
+           metrics.rootMeanSquaredError,
+           metrics.meanAbsoluteError,
+           metrics.r2
+           )
+
+print(s)
