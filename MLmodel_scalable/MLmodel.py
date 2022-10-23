@@ -45,3 +45,64 @@ df.groupby('ocean_proximity').agg({col: 'avg' for col in df.columns[3:-1]}).show
 
 from pyspark.sql.types import FloatType
 from pyspark.sql.functions import udf
+
+def squared(value):
+  return value * value
+
+squared_udf = udf(squared, FloatType())
+
+df.withColumn('total_rooms_squared', squared_udf('total_rooms')).show(5)
+
+df.show(5)
+
+train, test = df.randomSplit([0.7, 0.3])
+
+train, test
+
+numerical_features_lst = train.columns
+numerical_features_lst.remove('median_house_value')
+numerical_features_lst.remove('id')
+numerical_features_lst.remove('ocean_proximity')
+
+numerical_features_lst
+
+from pyspark.ml.feature import Imputer
+
+imputer = Imputer(inputCols=numerical_features_lst,
+                  outputCols=numerical_features_lst)
+
+imputer = imputer.fit(train)
+
+train = imputer.transform(train)
+test = imputer.transform(test)
+
+train.show(3)
+
+from pyspark.ml.feature import VectorAssembler
+
+numerical_vector_assembler = VectorAssembler(inputCols=numerical_features_lst,
+                                             outputCol='numerical_feature_vector')
+
+train = numerical_vector_assembler.transform(train)
+test = numerical_vector_assembler.transform(test)
+
+train.show(2)
+
+train.select('numerical_feature_vector').take(2)
+
+from pyspark.ml.feature import StandardScaler
+
+scaler = StandardScaler(inputCol='numerical_feature_vector',
+                        outputCol='scaled_numerical_feature_vector',
+                        withStd=True, withMean=True)
+
+scaler = scaler.fit(train)
+
+train = scaler.transform(train)
+test = scaler.transform(test)
+
+train.show(3)
+
+train.select('scaled_numerical_feature_vector').take(3)
+
+from pyspark.ml.feature import StringIndexer
